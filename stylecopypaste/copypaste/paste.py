@@ -145,8 +145,8 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False):
     return merged
 
 
-def training_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rotate= False):
-    vh = background.shape[0]; vw = background.shape[1]
+#pastes based on point input (can be x,ys of training set, or regions of interest etc)
+def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rotate= False, title = ""):
     merged = background.copy()
     
     pointlen = len(xpoints) # length for generating random locations from training data
@@ -169,7 +169,6 @@ def training_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, r
         safety = h if h > w else  w # makes sure object does not fall outside of boundary when rotated
 
         rand = random.randint(0,pointlen) #random points from training data
-        #random locations (top-left of bounding box)
 
         locx = int(xpoints[rand]-(w/2))#to place in centre, need to provide top-left bbox point (-w/2, +h/2)
         locy = int(ypoints[rand]+(h/2)) 
@@ -195,7 +194,7 @@ def training_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, r
 
 
     if show:
-        plt.title("Samples placed in familiar training locations")
+        plt.title(title)
         plt.axis('off')
         plt.imshow(merged)
 

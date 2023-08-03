@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+import cv2
 
 class points:
     def __init__(self,p):
@@ -32,10 +34,31 @@ class points:
         return centx,centy
     
     #returns points projected onto an image size, converts to integer
-    def denorm_centres(self, imShape):
-        denormX = np.multiply(self.norm_x,imShape[1])
-        denormY = np.multiply(self.norm_y,imShape[0])
+    def denorm_centres(self, imShape, pointsx=None, pointsy= None):
+        if pointsx is None or pointsy is None:
+            denormX = np.multiply(self.norm_x,imShape[1])
+            denormY = np.multiply(self.norm_y,imShape[0])
+        else:
+            denormX = np.multiply(pointsx,imShape[1])
+            denormY = np.multiply(pointsy,imShape[0])
+
         return np.rint(denormX).astype(int), np.rint(denormY).astype(int)
+    
+    #performs k means clustering
+    def getClusters(self,k,random_state = None):
+        #join points from both arrays into tuple
+        p_tuple = [(self.norm_x[i], self.norm_y[i]) for i in range(0, len(self.norm_x))]
+
+        #perform k means clustering of points
+        if random_state is None:
+            kmeans = KMeans(n_clusters=k).fit(p_tuple)
+        else:
+            kmeans = KMeans(n_clusters=k, random_state=random_state).fit(p_tuple)
+        
+        kCents = kmeans.cluster_centers_
+        x,y = zip(*kCents)
+
+        return x,y
     
     #show heatmap of centres
     def show_centres(self):
@@ -47,4 +70,23 @@ class points:
         plt.imshow(heatmap.T, extent=extent)
         plt.title("Normalised Centre-Point Heatmap")
         plt.show()
+
+    #show points overlaid on image
+    def show_centres_overlay(self,image,pointsx=None, pointsy= None, title = None):
+        if pointsx is None or pointsy is None:
+            pointsx = self.norm_x
+            pointsy = self.norm_y
         
+        plotted_im = image.copy()
+        for i in range(0,len(pointsx)):
+            cv2.circle(plotted_im, (int(pointsx[i]),int(pointsy[i])), radius=10, color=(0, 255, 0), thickness=-1)
+
+        plt.axis('off')
+        if title is not None:
+            plt.title(title)
+        plt.imshow(plotted_im)
+
+#getting points from segmented mask
+def segPoints(mask):
+    mpy, mpx = np.where(mask==1)
+    return mpx,mpy
