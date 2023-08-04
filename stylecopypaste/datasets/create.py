@@ -4,17 +4,18 @@ from . import taco
 from . import dashlit
 import cv2
 
-from ..copypaste.paste import rand_paste
-
+from ..copypaste.paste import rand_paste, points_paste
+from ..points.centrepoints import points
 """
 placement: 'random', 'points' (along training points) or 'seg' (segmented region)
 style: bool, transfer style or not. Default = False.
 src: source to get images and annotations  (contains "images" and "labels" folder)
 dest: place to save new images and annotations
+pts: points(optional) path to annotation csv
 """
 
 class dataset:
-    def __init__(self,src, dest, placement,style = False):
+    def __init__(self,src, dest, placement,style = False, pts=None):
         self.placement = placement
         self.style = style
 
@@ -30,9 +31,15 @@ class dataset:
         self.dest_images_dir = os.path.join(dest,"images")
         self.dest_labels_dir = os.path.join(dest,"labels")
 
-
+        #structures to contain taco processed ims and masks
         self.litIms = []
         self.litMasks = []
+        
+        #if points provided
+        if pts is not None:
+            #load from csv path given
+            self.points = points(pts)
+            self.kx, self.ky = self.points.getClusters(40,0)
     
     #creates new dataset
     def generate(self,litPath):
@@ -56,37 +63,42 @@ class dataset:
             self.__load_taco__(litPath)
 
         #place all randomly
-        if self.placement =="random":
-            for f in self.images:
+        
+        for f in self.images:
 
-                #############Perform image ops############
-                background = cv2.cvtColor(cv2.imread(f),cv2.COLOR_BGR2RGB)
+            #############Perform image ops############
+            background = cv2.cvtColor(cv2.imread(f),cv2.COLOR_BGR2RGB)
 
+            if self.placement =="random":
                 #perform random paste
                 result,xs,ys,ws,hs = rand_paste(self.litIms,self.litMasks,background,show=False, rotate=True,return_loc=True)
-                
-                #create save path
-                head_tail = os.path.split(f)
-                new_imp = os.path.join(self.dest_images_dir,head_tail[1])
+            if self.placement =="points":
+                #denormalise points for image
+                denormx, denormy = self.points.denorm_centres(background.shape,self.kx,self.ky)
+                result,xs,ys,ws,hs = points_paste(self.litIms,self.litMasks,background,denormx,denormy,show=False, rotate=True,return_loc=True)
+            
+            #create save path
+            head_tail = os.path.split(f)
+            new_imp = os.path.join(self.dest_images_dir,head_tail[1])
 
-                result = cv2.cvtColor(result,cv2.COLOR_RGB2BGR) # convert back to bgr for opencv save
-                cv2.imwrite(new_imp, result)
+            result = cv2.cvtColor(result,cv2.COLOR_RGB2BGR) # convert back to bgr for opencv save
+            cv2.imwrite(new_imp, result)
 
-                #############Perform label ops############
-                label_fname = head_tail[1].split(".")[0] +".txt" #convert to .txt fname
-                label_pname = os.path.join(self.labels_dir,label_fname) #get path of related label
-                ann_txt = open(label_pname, 'r') # read label file
-                lines = ann_txt.readlines() # save lines
-                ann_txt.close()
+            #############Perform label ops############
+            label_fname = head_tail[1].split(".")[0] +".txt" #convert to .txt fname
+            label_pname = os.path.join(self.labels_dir,label_fname) #get path of related label
+            ann_txt = open(label_pname, 'r') # read label file
+            lines = ann_txt.readlines() # save lines
+            ann_txt.close()
 
-                #add new synthetic annotations (class 0 as always one class 'litter')
-                for i in range(len(xs)):
-                    lines.append(f"0 {xs[i]} {ys[i]} {ws[i]} {hs[i]}\n")
+            #add new synthetic annotations (class 0 as always one class 'litter')
+            for i in range(len(xs)):
+                lines.append(f"0 {xs[i]} {ys[i]} {ws[i]} {hs[i]}\n")
 
-                #save to new file
-                save_label_fname = os.path.join(self.dest_labels_dir, label_fname)
-                with open(save_label_fname, 'w') as new_txt:
-                    new_txt.writelines(lines)
+            #save to new file
+            save_label_fname = os.path.join(self.dest_labels_dir, label_fname)
+            with open(save_label_fname, 'w') as new_txt:
+                new_txt.writelines(lines)
                 
 
 

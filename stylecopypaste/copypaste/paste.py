@@ -99,6 +99,7 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_lo
     vh = background.shape[0]; vw = background.shape[1]
     merged = background.copy()
     
+    #to save new litter coords/dims
     xs= []
     ys= []
     ws= []
@@ -159,8 +160,16 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_lo
 
 
 #pastes based on point input (can be x,ys of training set, or regions of interest etc)
-def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rotate= False, title = ""):
+def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rotate= False, title = "",return_loc = False):
+
+    vh = background.shape[0]; vw = background.shape[1]
     merged = background.copy()
+
+    #to save new litter coords/dims
+    xs= []
+    ys= []
+    ws= []
+    hs= []
     
     pointlen = len(xpoints) # length for generating random locations from training data
 
@@ -197,6 +206,13 @@ def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rot
             merged, w, h = combine(context_cut, context_mask, merged, locx , locy, rotate=True)      
         else:
             merged = combine(context_cut, context_mask, merged, locx , locy)
+
+        #save coords in yolo format
+        if return_loc:
+            xs.append((locx+(w/2))/vw)
+            ys.append((locy-(h/2))/vh)
+            ws.append(w/vw)
+            hs.append(h/vh)
             
 
         
@@ -211,4 +227,7 @@ def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rot
         plt.axis('off')
         plt.imshow(merged)
 
-    return merged
+    if return_loc:
+        return merged, xs,ys,ws,hs
+    else:
+        return merged
