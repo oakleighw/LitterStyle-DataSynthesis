@@ -95,10 +95,14 @@ def combine(litter_im, litter_mask, verge, x1, y1, rotate = False):
         return verge
 
 #paste samples randomly onto new image
-def rand_paste(sampIms,sampMasks,background, show=False, rotate= False):
+def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_loc = False):
     vh = background.shape[0]; vw = background.shape[1]
     merged = background.copy()
     
+    xs= []
+    ys= []
+    ws= []
+    hs= []
 
     if show:
         fig, ax = plt.subplots()
@@ -128,9 +132,15 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False):
             merged, w, h = combine(context_cut, context_mask, merged, locx , locy, rotate=True)      
         else:
             merged = combine(context_cut, context_mask, merged, locx , locy)
-            
 
-        
+        #save coords in yolo format
+        if return_loc:
+            xs.append((locx+(w/2))/vw)
+            ys.append((locy-(h/2))/vh)
+            ws.append(w/vw)
+            hs.append(h/vh)
+            
+        #if plotting to screen
         if show:
             rect = patches.Rectangle((locx, locy-h), w, h, linewidth=1, edgecolor='r', facecolor='none')
             ax.add_patch(rect)
@@ -142,7 +152,10 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False):
         plt.axis('off')
         plt.imshow(merged)
 
-    return merged
+    if return_loc:
+        return merged, xs,ys,ws,hs
+    else:
+        return merged
 
 
 #pastes based on point input (can be x,ys of training set, or regions of interest etc)
