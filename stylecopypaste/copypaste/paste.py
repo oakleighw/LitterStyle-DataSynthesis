@@ -79,7 +79,6 @@ def combine(litter_im, litter_mask, verge, x1, y1, rotate = False):
 
 
     #In each colour channel, cut out mask and add foreground channels
-    
     Rn = cv2.bitwise_and(Rb,Rb,mask=inv_mask) + Rf
     Gn = cv2.bitwise_and(Gb,Gb,mask=inv_mask) + Gf
     Bn = cv2.bitwise_and(Bb,Bb,mask=inv_mask) + Bf

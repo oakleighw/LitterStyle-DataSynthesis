@@ -1,6 +1,8 @@
 from . import adain_model
 import tensorflow as tf
 from tensorflow import keras
+import numpy as np
+import cv2
 
 class t_model:
     #initialise model with image size & weights
@@ -34,3 +36,23 @@ class t_model:
         reconstructed_image = self.decoder(t)
     
         return tf.squeeze(reconstructed_image)# removes extra dim
+    
+
+    #generates neural style transfer image and new mask
+    def generate_style_data(self,style,content,mask):
+        og_size = content.shape
+        style = np.array(style)
+        style = tf.expand_dims(tf.convert_to_tensor(style),axis=0)
+
+        content = np.array(content)
+        content = tf.expand_dims(tf.convert_to_tensor(content),axis=0)
+
+        nst_im = self.transferStyle(style,content).numpy()
+
+        #resize image back to normal after passing through model
+        lit= cv2.resize(nst_im, (og_size[1],og_size[0]))
+
+        lit = lit*255 #denormalise
+        lit = cv2.bitwise_and(lit,lit,mask = mask)
+
+        return lit

@@ -1,29 +1,42 @@
 #Program which creates new yolo datasets
 import os
 from . import taco
-from . import dashlit
+from .dashlit import dashlit
 import cv2
+import gc
+import torch
+from tqdm import tqdm
 
 from ..copypaste.paste import rand_paste, points_paste
 from ..points.centrepoints import points
+from ..points.centrepoints import segPoints
+from ..segment.roi import SAM
+from ..style.transfer import t_model
+
+
+
+
+
+
 """
 placement: 'random', 'points' (along training points) or 'seg' (segmented region)
-style: bool, transfer style or not. Default = False.
+style: Path to style weights. Default = None.
 src: source to get images and annotations  (contains "images" and "labels" folder)
 dest: place to save new images and annotations
 pts: points(optional) path to annotation csv
 """
 
 class dataset:
-    def __init__(self,src, dest, placement,style = False, pts=None):
+    def __init__(self,src, dest, placement,style = None, pts=None):
         self.placement = placement
+
         self.style = style
 
-        images_dir = os.path.join(src,"images")
+        self.images_dir = os.path.join(src,"images")
         self.labels_dir = os.path.join(src,"labels")
 
         #get images and labels file paths as arrays
-        self.images = [os.path.join(images_dir,imp) for imp in os.listdir(images_dir)]
+        self.images = [os.path.join(self.images_dir,imp) for imp in os.listdir(self.images_dir)]
         self.labels = [os.path.join(self.labels_dir,labp) for labp in os.listdir(self.labels_dir)]
 
         self.dest = dest
@@ -34,13 +47,19 @@ class dataset:
         #structures to contain taco processed ims and masks
         self.litIms = []
         self.litMasks = []
+
         
         #if points provided
         if pts is not None:
             #load from csv path given
             self.points = points(pts)
             self.kx, self.ky = self.points.getClusters(40,0)
-    
+        
+        #if style path provided
+        if self.style is not None:
+            #load adaIN model
+            self.model = t_model(imsize= 96,weightspath= style)
+
     #creates new dataset
     def generate(self,litPath):
         
@@ -62,20 +81,64 @@ class dataset:
         if len(self.litIms) == 0 and len(self.litMasks) == 0:
             self.__load_taco__(litPath)
 
-        #place all randomly
+        #set up SAM model if segmentation-placement
+        if self.placement =="seg":
+            sam = SAM(checkpoint = "sam_vit_h_4b8939.pth", model_type = "vit_h") #Add cuda here if on gpu!
         
-        for f in self.images:
+        print("Generating Images (Wait while I litter)...")
+
+
+        for f in tqdm(self.images):
+            #############get random selection here###############
+
+            lit_ims = self.litIms
+            lit_masks = self.litMasks
+            #############Perform style transfer###################
+            if self.style is not None:
+            ###########################
+            #get dashlit ims
+
+                dash = dashlit(self.images_dir,self.labels_dir)
+                dash.getDashlit(0,2) # same amount as taco litter for now, no randomising. bug here when changing amnts
+
+                lit_ims = []
+
+                #generate new style images
+                for i in range(2): 
+                    nst_im= self.model.generate_style_data(dash.litIms[i],self.litIms[i],self.litMasks[i])
+                    lit_ims.append(nst_im)
+
+
 
             #############Perform image ops############
+
             background = cv2.cvtColor(cv2.imread(f),cv2.COLOR_BGR2RGB)
 
+
+
+
+            #perform image synthesis based on flag
             if self.placement =="random":
                 #perform random paste
-                result,xs,ys,ws,hs = rand_paste(self.litIms,self.litMasks,background,show=False, rotate=True,return_loc=True)
+                result,xs,ys,ws,hs = rand_paste(lit_ims,lit_masks,background,show=False, rotate=True,return_loc=True)
+
             if self.placement =="points":
                 #denormalise points for image
                 denormx, denormy = self.points.denorm_centres(background.shape,self.kx,self.ky)
-                result,xs,ys,ws,hs = points_paste(self.litIms,self.litMasks,background,denormx,denormy,show=False, rotate=True,return_loc=True)
+                result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,denormx,denormy,show=False, rotate=True,return_loc=True)
+
+            if self.placement =="seg":
+                #clear cache
+                gc.collect()
+                torch.cuda.empty_cache()
+
+                #denormalise points for image
+                denormx, denormy = self.points.denorm_centres(background.shape,self.kx,self.ky)
+                mask = sam.getMask(background,denormx,denormy) #get mask
+                #get point locations from mask
+                x,y = segPoints(mask)
+                result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,x,y,show=False, rotate=True,return_loc=True)
+                
             
             #create save path
             head_tail = os.path.split(f)
@@ -99,6 +162,8 @@ class dataset:
             save_label_fname = os.path.join(self.dest_labels_dir, label_fname)
             with open(save_label_fname, 'w') as new_txt:
                 new_txt.writelines(lines)
+
+        print("Done!")
                 
 
 
@@ -116,11 +181,6 @@ class dataset:
 
 
 
-    #generates new image
-    def generate_im(self,imp):
-        pass
+
 
     
-    #generates new label
-    def generate_label(self,labp):
-        pass
