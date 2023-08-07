@@ -21,7 +21,7 @@ class t_model:
         )
 
         self.model.compile(optimizer=self.optimizer, loss_fn=self.loss_fn)
-        self.model.load_weights(weightspath)
+        self.model.load_weights(weightspath).expect_partial()
 
     #transfer style onto content
     def transferStyle(self,style,content):
@@ -55,4 +55,4 @@ class t_model:
         lit = lit*255 #denormalise
         lit = cv2.bitwise_and(lit,lit,mask = mask)
 
-        return lit
+        return lit, mask

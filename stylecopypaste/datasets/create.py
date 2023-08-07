@@ -5,7 +5,8 @@ from .dashlit import dashlit
 import cv2
 import gc
 import torch
-from tqdm import tqdm
+from tqdm.notebook import tqdm
+import random
 
 from ..copypaste.paste import rand_paste, points_paste
 from ..points.centrepoints import points
@@ -83,30 +84,61 @@ class dataset:
 
         #set up SAM model if segmentation-placement
         if self.placement =="seg":
-            sam = SAM(checkpoint = "sam_vit_h_4b8939.pth", model_type = "vit_h") #Add cuda here if on gpu!
-        
+            sam = SAM(checkpoint = "sam_vit_h_4b8939.pth", model_type = "vit_h") #Add "cuda" here if on gpu!
+
+        #load dashlit data if using style
+        if self.style is not None:
+            print("Loading Dashlit Data...")
+
+            #get dashlit litter samples.
+            dash = dashlit(self.images_dir,self.labels_dir)
+
+            dash.getDashlit(0,10000) # range can only be as big as litter instances in training data
+
         print("Generating Images (Wait while I litter)...")
+
+        
 
 
         for f in tqdm(self.images):
             #############get random selection here###############
 
-            lit_ims = self.litIms
-            lit_masks = self.litMasks
+            taco_lit_ims = []
+            taco_masks = []
+
+            #get random selection of taco litter (between 2-7 pieces)
+            amnt = random.randint(2,7)
+
+            for t in range(amnt):
+                #for each of the taco litter piece, select a random one from the dataset
+                taco_choice = random.choice(range(len(self.litIms)))
+                taco_lit_ims.append(self.litIms[taco_choice])
+                taco_masks.append(self.litMasks[taco_choice])
+
+
+
+
             #############Perform style transfer###################
             if self.style is not None:
             ###########################
-            #get dashlit ims
-
-                dash = dashlit(self.images_dir,self.labels_dir)
-                dash.getDashlit(0,2) # same amount as taco litter for now, no randomising. bug here when changing amnts
-
-                lit_ims = []
-
-                #generate new style images
-                for i in range(2): 
-                    nst_im= self.model.generate_style_data(dash.litIms[i],self.litIms[i],self.litMasks[i])
+                
+                ###change this when testing with complete dataset (cannot be larger than litter in images)
+                
+                
+                lit_ims = [] #these will be the litters actually pasted if style == true
+                lit_masks = []
+                
+                #generate new style image - random style from dashlit, random selection from 
+                for i in range(amnt): 
+                    #get random style from dashlit pieces
+                    dashstyle_index = random.randint(0,len(dash.litIms)-1)
+                    nst_im, nst_mask = self.model.generate_style_data(dash.litIms[dashstyle_index],taco_lit_ims[i],taco_masks[i])
                     lit_ims.append(nst_im)
+                    lit_masks.append(nst_mask)
+            
+            else:
+                lit_ims = taco_lit_ims #these will be the litters actually pasted if style == False
+                lit_masks = taco_masks
 
 
 
@@ -120,12 +152,19 @@ class dataset:
             #perform image synthesis based on flag
             if self.placement =="random":
                 #perform random paste
-                result,xs,ys,ws,hs = rand_paste(lit_ims,lit_masks,background,show=False, rotate=True,return_loc=True)
+                try:
+                    result,xs,ys,ws,hs = rand_paste(lit_ims,lit_masks,background,show=False, rotate=True,return_loc=True)
+                except:
+                    continue # if issue with taco sample
+
 
             if self.placement =="points":
                 #denormalise points for image
                 denormx, denormy = self.points.denorm_centres(background.shape,self.kx,self.ky)
-                result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,denormx,denormy,show=False, rotate=True,return_loc=True)
+                try:
+                    result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,denormx,denormy,show=False, rotate=True,return_loc=True)
+                except:
+                    continue # if issue with taco sample
 
             if self.placement =="seg":
                 #clear cache
@@ -137,7 +176,10 @@ class dataset:
                 mask = sam.getMask(background,denormx,denormy) #get mask
                 #get point locations from mask
                 x,y = segPoints(mask)
-                result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,x,y,show=False, rotate=True,return_loc=True)
+                try:
+                    result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,x,y,show=False, rotate=True,return_loc=True)
+                except:
+                    continue # if issue with taco sample
                 
             
             #create save path
@@ -173,7 +215,7 @@ class dataset:
     def __load_taco__(self,litPath):
         lits = taco.taco(litPath)
         #ids = range(1500) # get all taco dataset
-        ids = range(15) #15 for testing                           ###NEED TO UPDATE THIS TO A RANDOM SELECTION PER IMAGE WITH FULL DATASET.
+        ids = range(1500) #15 for testing                           ###NEED TO UPDATE THIS TO A RANDOM SELECTION PER IMAGE WITH FULL DATASET.
         print("Loading Taco Data...")
         lits.getTaco(ids)
         self.litIms = lits.litIms

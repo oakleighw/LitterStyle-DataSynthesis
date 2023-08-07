@@ -111,11 +111,11 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_lo
         
         #resize depending on largest side
         if litSamp.shape[0] > litSamp.shape[1]:
-            new_lit_height = random.randint(30,70)# height for litter resizing
+            new_lit_height = random.randint(20,50)# height for litter resizing
             #resize litter to height
             context_cut, w , h = instance_resize(sampIms[i],height=new_lit_height) ; context_mask,_,_ = instance_resize(sampMasks[i],height=new_lit_height)
         else:
-            new_lit_width = random.randint(30,70)# height for litter resizing
+            new_lit_width = random.randint(20,50)# width for litter resizing
             #resize litter to height
             context_cut, w , h = instance_resize(sampIms[i],width=new_lit_width) ; context_mask,_,_ = instance_resize(sampMasks[i],width=new_lit_width)
 
@@ -179,17 +179,17 @@ def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rot
         
         #resize depending on largest side
         if litSamp.shape[0] > litSamp.shape[1]:
-            new_lit_height = random.randint(30,70)# height for litter resizing
+            new_lit_height = random.randint(30,50)# height for litter resizing
             #resize litter to height
             context_cut, w , h = instance_resize(sampIms[i],height=new_lit_height) ; context_mask,_,_ = instance_resize(sampMasks[i],height=new_lit_height)
         else:
-            new_lit_width = random.randint(30,70)# height for litter resizing
+            new_lit_width = random.randint(30,50)# width for litter resizing
             #resize litter to height
             context_cut, w , h = instance_resize(sampIms[i],width=new_lit_width) ; context_mask,_,_ = instance_resize(sampMasks[i],width=new_lit_width)
 
         safety = h if h > w else  w # makes sure object does not fall outside of boundary when rotated
 
-        rand = random.randint(0,pointlen) #random points from training data
+        rand = random.randint(0,pointlen-1) #random points from training data
 
         locx = int(xpoints[rand]-(w/2))#to place in centre, need to provide top-left bbox point (-w/2, +h/2)
         locy = int(ypoints[rand]+(h/2)) 
