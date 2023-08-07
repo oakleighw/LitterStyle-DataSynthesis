@@ -93,7 +93,7 @@ class dataset:
             #get dashlit litter samples.
             dash = dashlit(self.images_dir,self.labels_dir)
 
-            dash.getDashlit(0,10000) # range can only be as big as litter instances in training data
+            dash.getDashlit(0,1000) #get 1000 samples of dashlit
 
         print("Generating Images (Wait while I litter)...")
 
@@ -129,12 +129,16 @@ class dataset:
                 lit_masks = []
                 
                 #generate new style image - random style from dashlit, random selection from 
-                for i in range(amnt): 
-                    #get random style from dashlit pieces
-                    dashstyle_index = random.randint(0,len(dash.litIms)-1)
-                    nst_im, nst_mask = self.model.generate_style_data(dash.litIms[dashstyle_index],taco_lit_ims[i],taco_masks[i])
-                    lit_ims.append(nst_im)
-                    lit_masks.append(nst_mask)
+                try:
+                    for i in range(amnt): 
+                        #get random style from dashlit pieces
+                        dashstyle_index = random.randint(0,len(dash.litIms)-1)
+                        nst_im, nst_mask = self.model.generate_style_data(dash.litIms[dashstyle_index],taco_lit_ims[i],taco_masks[i])
+                        lit_ims.append(nst_im)
+                        lit_masks.append(nst_mask)
+                except:
+                    continue # if taco litter error
+
             
             else:
                 lit_ims = taco_lit_ims #these will be the litters actually pasted if style == False
@@ -215,7 +219,7 @@ class dataset:
     def __load_taco__(self,litPath):
         lits = taco.taco(litPath)
         #ids = range(1500) # get all taco dataset
-        ids = range(1500) #15 for testing                           ###NEED TO UPDATE THIS TO A RANDOM SELECTION PER IMAGE WITH FULL DATASET.
+        ids = range(1498) #15 for testing                      
         print("Loading Taco Data...")
         lits.getTaco(ids)
         self.litIms = lits.litIms
