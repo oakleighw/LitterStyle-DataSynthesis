@@ -25,13 +25,15 @@ style: Path to style weights. Default = None.
 src: source to get images and annotations  (contains "images" and "labels" folder)
 dest: place to save new images and annotations
 pts: points(optional) path to annotation csv
+blend: bool, whether to using poisson blending on litter samples
 """
 
 class dataset:
-    def __init__(self,src, dest, placement,style = None, pts=None):
+    def __init__(self,src, dest, placement,style = None, pts=None, blend=False):
         self.placement = placement
 
         self.style = style
+        self.blend = blend
 
         self.images_dir = os.path.join(src,"images")
         self.labels_dir = os.path.join(src,"labels")
@@ -84,7 +86,7 @@ class dataset:
 
         #set up SAM model if segmentation-placement
         if self.placement =="seg":
-            sam = SAM(checkpoint = "sam_vit_h_4b8939.pth", model_type = "vit_h") #Add "cuda" here if on gpu!
+            sam = SAM(checkpoint = "sam_vit_h_4b8939.pth", model_type = "vit_h", device="cuda") #Add "cuda" here if on gpu!
 
         #load dashlit data if using style
         if self.style is not None:
@@ -157,7 +159,7 @@ class dataset:
             if self.placement =="random":
                 #perform random paste
                 try:
-                    result,xs,ys,ws,hs = rand_paste(lit_ims,lit_masks,background,show=False, rotate=True,return_loc=True)
+                    result,xs,ys,ws,hs = rand_paste(lit_ims,lit_masks,background,show=False, rotate=True,return_loc=True, blend = self.blend)
                 except:
                     continue # if issue with taco sample
 
@@ -166,7 +168,7 @@ class dataset:
                 #denormalise points for image
                 denormx, denormy = self.points.denorm_centres(background.shape,self.kx,self.ky)
                 try:
-                    result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,denormx,denormy,show=False, rotate=True,return_loc=True)
+                    result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,denormx,denormy,show=False, rotate=True,return_loc=True, blend = self.blend)
                 except:
                     continue # if issue with taco sample
 
@@ -181,7 +183,7 @@ class dataset:
                 #get point locations from mask
                 x,y = segPoints(mask)
                 try:
-                    result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,x,y,show=False, rotate=True,return_loc=True)
+                    result,xs,ys,ws,hs = points_paste(lit_ims,lit_masks,background,x,y,show=False, rotate=True,return_loc=True, blend = self.blend)
                 except:
                     continue # if issue with taco sample
                 
@@ -219,7 +221,7 @@ class dataset:
     def __load_taco__(self,litPath):
         lits = taco.taco(litPath)
         #ids = range(1500) # get all taco dataset
-        ids = range(1498) #15 for testing                      
+        ids = range(1500) #15 for testing                      
         print("Loading Taco Data...")
         lits.getTaco(ids)
         self.litIms = lits.litIms

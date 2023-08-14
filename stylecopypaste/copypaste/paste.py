@@ -44,7 +44,7 @@ def instance_resize(image, width = None, height = None, inter = cv2.INTER_AREA):
 
 
 #combine litter and subsection of an image -> x1 and y1 are top-left of litter bounding box (top left cropped sample)
-def combine(litter_im, litter_mask, verge, x1, y1, rotate = False):
+def combine(litter_im, litter_mask, verge, x1, y1, rotate = False,blend = False):
     #Add images together
     
     #if rotate ==True, randomly rotate (possibility of no rotation '0' degrees)
@@ -66,35 +66,41 @@ def combine(litter_im, litter_mask, verge, x1, y1, rotate = False):
     min_height = litter_im.shape[0]
     min_width = litter_im.shape[1]
 
-    # Crop images with minimum height and width (object height/width)
-    foreground = litter_im
-    background = verge[y1-min_height:y1,x1:x1+min_width]
+    if blend: # poisson blending if true
+        litter_mask = 255*litter_mask 
+        centre = (x1+(min_width//2),y1-(min_height//2))
+        verge = cv2.seamlessClone(litter_im, verge, litter_mask, centre, cv2.MIXED_CLONE)
     
-    (Rb, Gb, Bb) = cv2.split(background)
-    (Rf, Gf, Bf) = cv2.split(foreground)
+    else:
+        # Crop images with minimum height and width (object height/width)
+        foreground = litter_im
+        background = verge[y1-min_height:y1,x1:x1+min_width]
+        
+        (Rb, Gb, Bb) = cv2.split(background)
+        (Rf, Gf, Bf) = cv2.split(foreground)
 
 
-    #invert mask
-    inv_mask = 1-litter_mask
+        #invert mask
+        inv_mask = 1-litter_mask
 
 
-    #In each colour channel, cut out mask and add foreground channels
-    Rn = cv2.bitwise_and(Rb,Rb,mask=inv_mask) + Rf
-    Gn = cv2.bitwise_and(Gb,Gb,mask=inv_mask) + Gf
-    Bn = cv2.bitwise_and(Bb,Bb,mask=inv_mask) + Bf
+        #In each colour channel, cut out mask and add foreground channels
+        Rn = cv2.bitwise_and(Rb,Rb,mask=inv_mask) + Rf
+        Gn = cv2.bitwise_and(Gb,Gb,mask=inv_mask) + Gf
+        Bn = cv2.bitwise_and(Bb,Bb,mask=inv_mask) + Bf
 
-    #merge channels back together
-    merged = cv2.merge([Rn,Gn,Bn])
-    
-    verge[y1-min_height:y1,x1:x1+min_width] = merged #paste created background/litter combination into full image
-    
+        #merge channels back together
+        merged = cv2.merge([Rn,Gn,Bn])
+        
+        verge[y1-min_height:y1,x1:x1+min_width] = merged #paste created background/litter combination into full image
+        
     if rotate: #return dimensions if rotating as may be altered
         return verge, min_width, min_height #min width and min height are returned incase of rotation (Swaps points)
     else:
         return verge
 
 #paste samples randomly onto new image
-def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_loc = False):
+def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_loc = False, blend = False):
     vh = background.shape[0]; vw = background.shape[1]
     merged = background.copy()
     
@@ -129,9 +135,9 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_lo
 
         #combine with background
         if rotate:
-            merged, w, h = combine(context_cut, context_mask, merged, locx , locy, rotate=True)      
+            merged, w, h = combine(context_cut, context_mask, merged, locx , locy, rotate=True, blend = blend)      
         else:
-            merged = combine(context_cut, context_mask, merged, locx , locy)
+            merged = combine(context_cut, context_mask, merged, locx , locy , blend = blend)
 
         #save coords in yolo format
         if return_loc:
@@ -159,7 +165,7 @@ def rand_paste(sampIms,sampMasks,background, show=False, rotate= False,return_lo
 
 
 #pastes based on point input (can be x,ys of training set, or regions of interest etc)
-def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rotate= False, title = "",return_loc = False):
+def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rotate= False, title = "",return_loc = False, blend = False):
 
     vh = background.shape[0]; vw = background.shape[1]
     merged = background.copy()
@@ -202,9 +208,9 @@ def points_paste(sampIms,sampMasks,background, xpoints, ypoints, show=False, rot
 
         #combine with background
         if rotate:
-            merged, w, h = combine(context_cut, context_mask, merged, locx , locy, rotate=True)      
+            merged, w, h = combine(context_cut, context_mask, merged, locx , locy, rotate=True, blend = blend)      
         else:
-            merged = combine(context_cut, context_mask, merged, locx , locy)
+            merged = combine(context_cut, context_mask, merged, locx , locy , blend = blend)
 
         #save coords in yolo format
         if return_loc:
